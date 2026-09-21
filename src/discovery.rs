@@ -6,7 +6,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Set up the multicast UDP socket using socket2 for cross-platform reuse flags.
 fn create_multicast_socket(addr: Ipv4Addr, port: u16) -> Result<std::net::UdpSocket> {
@@ -14,11 +14,6 @@ fn create_multicast_socket(addr: Ipv4Addr, port: u16) -> Result<std::net::UdpSoc
         .context("Failed to create UDP socket")?;
 
     socket.set_reuse_address(true).context("Failed to set SO_REUSEADDR")?;
-
-    #[cfg(unix)]
-    {
-        let _ = socket.set_reuse_port(true);
-    }
 
     socket.set_nonblocking(true).context("Failed to set non-blocking")?;
 

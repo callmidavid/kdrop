@@ -36,7 +36,7 @@ eframe = { version = "0.27", features = ["default"] }
 egui = "0.27"
 
 # Streaming
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 futures = "0.3"
 
 # Platform utilities

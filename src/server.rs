@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::{
     body::Bytes,
     extract::{Multipart, Path, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, StatusCode},
     response::{sse::Event, IntoResponse, Response, Sse},
     routing::{get, post},
     Json, Router,
@@ -23,7 +23,7 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
-use tracing::{error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 // Embedded static web UI files

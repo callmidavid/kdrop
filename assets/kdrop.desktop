@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=kdrop
+Comment=Local peer-to-peer file sharing
+Exec=kdrop
+Icon=kdrop
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;Utility;
+Keywords=airdrop;localsend;sharing;files;
+StartupNotify=true
+

@@ -6,7 +6,7 @@ use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]

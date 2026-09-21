@@ -1,14 +1,12 @@
 use crate::config::Config;
-use crate::peer::{FileInfo, Peer, PeerRegistry, PendingSession};
-use crate::server::{AppEvent, AppState, SharedFileItem};
+use crate::peer::{PeerRegistry, PendingSession};
+use crate::server::{AppEvent, AppState};
 use crate::transfer::{TransferManager, TransferProgress};
 use eframe::egui;
 use image::Luma;
 use qrcode::QrCode;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::info;
 
 pub struct KdropApp {
     config: Arc<Config>,

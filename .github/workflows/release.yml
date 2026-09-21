@@ -1,0 +1,178 @@
+name: Release kdrop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name for release (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxkbcommon-dev libwayland-dev
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Package Tarball
+        run: |
+          mkdir -p dist/kdrop-linux-x86_64
+          cp target/release/kdrop dist/kdrop-linux-x86_64/
+          cp README.md dist/kdrop-linux-x86_64/
+          cp assets/kdrop.desktop dist/kdrop-linux-x86_64/
+          cp assets/kdrop.svg dist/kdrop-linux-x86_64/
+          tar -czf kdrop-linux-x86_64.tar.gz -C dist kdrop-linux-x86_64
+
+      - name: Build Debian (.deb) Package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [ "$VERSION" = "$GITHUB_REF" ]; then
+            VERSION="${{ github.event.inputs.tag_name }}"
+            VERSION=${VERSION#v}
+          fi
+
+          DEB_DIR="deb-pkg"
+          mkdir -p ${DEB_DIR}/DEBIAN
+          mkdir -p ${DEB_DIR}/usr/bin
+          mkdir -p ${DEB_DIR}/usr/share/applications
+          mkdir -p ${DEB_DIR}/usr/share/icons/hicolor/scalable/apps
+
+          cp target/release/kdrop ${DEB_DIR}/usr/bin/
+          cp assets/kdrop.desktop ${DEB_DIR}/usr/share/applications/
+          cp assets/kdrop.svg ${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/
+
+          cat <<EOF > ${DEB_DIR}/DEBIAN/control
+          Package: kdrop
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Kafy OS Team <info@kafy.org>
+          Description: Fast, local peer-to-peer file sharing for Linux, iPhone, and Android
+           kdrop is a lightweight, AirDrop-inspired local network file sharing tool.
+          EOF
+
+          dpkg-deb --build --root-owner-group ${DEB_DIR} kdrop_${VERSION}_amd64.deb
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            kdrop-linux-x86_64.tar.gz
+            kdrop_*_amd64.deb
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Package ZIP
+        run: |
+          mkdir dist
+          copy target\release\kdrop.exe dist\
+          copy README.md dist\
+          Compress-Archive -Path dist\* -DestinationPath kdrop-windows-x86_64.zip
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: kdrop-windows-x86_64.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Package Tarball
+        run: |
+          mkdir -p dist/kdrop-macos
+          cp target/release/kdrop dist/kdrop-macos/
+          cp README.md dist/kdrop-macos/
+          tar -czf kdrop-macos-universal.tar.gz -C dist kdrop-macos
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: kdrop-macos-universal.tar.gz
+
+  create-release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Compute Checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Determine Tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: kdrop ${{ steps.tag.outputs.TAG }}
+          files: release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
