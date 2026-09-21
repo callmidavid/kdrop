@@ -31,6 +31,7 @@ use uuid::Uuid;
 const INDEX_HTML: &str = include_str!("web/index.html");
 const STYLE_CSS: &str = include_str!("web/style.css");
 const APP_JS: &str = include_str!("web/app.js");
+const LOGO_PNG: &[u8] = include_bytes!("assets/logo.png");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
@@ -130,6 +131,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/", get(serve_index))
         .route("/style.css", get(serve_css))
         .route("/app.js", get(serve_js))
+        .route("/logo.png", get(serve_logo))
         .route("/qr", get(serve_qr))
         // API endpoints
         .route("/api/info", get(get_info))
@@ -157,6 +159,13 @@ async fn serve_css() -> impl IntoResponse {
 
 async fn serve_js() -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8")], APP_JS)
+}
+
+async fn serve_logo() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "image/png")],
+        LOGO_PNG,
+    )
 }
 
 async fn serve_qr(State(state): State<AppState>) -> impl IntoResponse {
@@ -397,37 +406,39 @@ async fn sse_handler(
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = state.event_tx.subscribe();
-    let stream = BroadcastStream::new(rx).filter_map(|msg| match msg {
-        Ok(event) => match event {
-            AppEvent::TransferRequest {
-                session_id,
-                sender_alias,
-                files,
-            } => {
-                let data = serde_json::json!({
-                    "sessionId": session_id,
-                    "senderAlias": sender_alias,
-                    "files": files
-                });
-                Some(Ok(Event::default()
-                    .event("transfer_request")
-                    .data(data.to_string())))
-            }
-            AppEvent::TransferDecision {
-                session_id,
-                accepted,
-            } => {
-                let data = serde_json::json!({
-                    "sessionId": session_id,
-                    "accepted": accepted
-                });
-                Some(Ok(Event::default()
-                    .event("transfer_decision")
-                    .data(data.to_string())))
-            }
-            AppEvent::FilesUpdated => Some(Ok(Event::default().event("files_updated").data("{}"))),
-        },
-        Err(_) => None,
+    let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
+        match msg {
+            Ok(event) => match event {
+                AppEvent::TransferRequest {
+                    session_id,
+                    sender_alias,
+                    files,
+                } => {
+                    let data = serde_json::json!({
+                        "sessionId": session_id,
+                        "senderAlias": sender_alias,
+                        "files": files
+                    });
+                    Some(Ok(Event::default()
+                        .event("transfer_request")
+                        .data(data.to_string())))
+                }
+                AppEvent::TransferDecision {
+                    session_id,
+                    accepted,
+                } => {
+                    let data = serde_json::json!({
+                        "sessionId": session_id,
+                        "accepted": accepted
+                    });
+                    Some(Ok(Event::default()
+                        .event("transfer_decision")
+                        .data(data.to_string())))
+                }
+                AppEvent::FilesUpdated => Some(Ok(Event::default().event("files_updated").data("{}"))),
+            },
+            Err(_) => None,
+        }
     });
 
     Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)))

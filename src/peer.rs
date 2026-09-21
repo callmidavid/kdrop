@@ -25,13 +25,13 @@ impl Peer {
         format!("{}://{}:{}", self.protocol, self.ip, self.port)
     }
 
-    /// Icon character to show next to device name.
-    pub fn icon(&self) -> &'static str {
+    /// Short text label for device type — shown as a pill badge in the UI.
+    pub fn device_type_label(&self) -> &'static str {
         match self.device_type {
-            DeviceType::Mobile => "📱",
-            DeviceType::Desktop => "🖥",
-            DeviceType::Web => "🌐",
-            DeviceType::Headless | DeviceType::Server => "🖧",
+            DeviceType::Mobile => "Mobile",
+            DeviceType::Desktop => "Desktop",
+            DeviceType::Web => "Web",
+            DeviceType::Headless | DeviceType::Server => "Server",
         }
     }
 }

@@ -1,6 +1,8 @@
 <div align="center">
 
-# 💧 kdrop
+<img src="assets/kdrop.png" alt="kdrop logo" width="96" height="96" style="border-radius: 20px;">
+
+# kdrop
 
 **An open-source, AirDrop-inspired local file sharing tool with Touch-to-Transfer proximity sensing.**
 
@@ -8,7 +10,7 @@ Share files, photos, videos, and documents seamlessly across **Linux, iPhone, An
 
 [![Release](https://img.shields.io/github/v/release/callmidavid/kdrop?color=blue&logo=github)](https://github.com/callmidavid/kdrop/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20iOS%20%7C%20Android-purple)](#downloads)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20iOS%20%7C%20Android-blue)](#downloads)
 
 </div>
 
@@ -20,13 +22,13 @@ kdrop features **hardware-free proximity sensing** using Bluetooth Low Energy (B
 
 - **Bring to Bump:** Place your iPhone or Android phone right beside your laptop (< 20 cm).
 - **Instant Detection:** kdrop senses the radio signal spike (`> -44 dBm`) using an Exponential Moving Average (EMA) filter.
-- **1-Click Drop:** The app immediately illuminates with a glowing **⚡ Device Bump** banner:
+- **1-Click Drop:** The app immediately illuminates with a glowing **Device Bump** banner:
   > _"Device Bump: 'iPhone 15' is right beside laptop! [Drop Files]"_
 - Click **Drop Files**, and your transfer begins instantly without having to browse device lists or scan codes.
 
 ---
 
-## 📥 Downloads
+## Downloads
 
 Pre-built binaries are ready for instant download on the [**GitHub Releases**](https://github.com/kafy-os/kdrop/releases) page.
 
@@ -47,7 +49,7 @@ sudo dpkg -i kdrop_*_amd64.deb
 
 ---
 
-## 🔍 How It Works
+## How It Works
 
 kdrop uses a decentralized, peer-to-peer architecture inspired by LocalSend and AirDrop:
 
@@ -89,7 +91,7 @@ kdrop uses a decentralized, peer-to-peer architecture inspired by LocalSend and 
 
 ---
 
-## 📱 Using kdrop on iPhone & Android (Zero Installation)
+## Using kdrop on iPhone & Android (Zero Installation)
 
 You don't need to install anything from the App Store or Google Play:
 
@@ -101,12 +103,12 @@ You don't need to install anything from the App Store or Google Play:
 
 ---
 
-## 🌐 Network Requirements
+## Network Requirements
 
 - **Local Network:** Both devices must be connected to the same Wi-Fi router or mobile hotspot.
 - **Port 53317:** Ensure firewall rules permit TCP & UDP traffic on port `53317`.
 - **AP / Client Isolation:** In university, hotel, or public guest Wi-Fi networks, routers often turn on _Client Isolation_ (blocking devices from seeing each other). If this happens, connect both devices to a portable Wi-Fi hotspot.
 
-## 📄 License
+## License
 
 kdrop is open-source under the [MIT License](LICENSE).

@@ -10,7 +10,7 @@
   <div class="app-container">
     <header class="app-header">
       <div class="logo">
-        <span class="icon">💧</span>
+        <img src="/logo.png" alt="kdrop" class="logo-img" onerror="this.style.display='none'">
         <span class="title">kdrop</span>
       </div>
       <div class="device-badge" id="hostDeviceBadge">
@@ -26,7 +26,11 @@
         <div class="dropzone" id="dropzone">
           <input type="file" id="fileInput" multiple style="display: none;">
           <div class="dropzone-content">
-            <span class="upload-icon">📤</span>
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
             <p class="dropzone-text">Tap to select or drop files here</p>
             <button class="btn btn-primary" id="selectFilesBtn">Choose Files</button>
           </div>
@@ -53,7 +57,13 @@
     <!-- Transfer Request Modal -->
     <div class="modal-backdrop" id="requestModal" style="display: none;">
       <div class="modal-card">
-        <div class="modal-icon">📥</div>
+        <div class="modal-icon-wrap">
+          <svg class="modal-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
         <h3>Incoming Transfer</h3>
         <p><strong id="modalSender">Device</strong> wants to send you files:</p>
         <ul class="file-preview-list" id="modalFileList"></ul>
@@ -68,4 +78,3 @@
   <script src="/app.js"></script>
 </body>
 </html>
-

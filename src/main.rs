@@ -55,12 +55,12 @@ async fn main() -> Result<()> {
     });
 
     let local_url = config.local_url();
-    println!("==================================================");
-    println!("💧 kdrop is running!");
-    println!("📡 Device: {}", config.alias);
-    println!("🔗 Local Web URL: {}", local_url);
-    println!("📁 Received files saved to: {:?}", config.download_dir);
-    println!("==================================================");
+    println!("--------------------------------------------------");
+    println!("  kdrop  --  fast local file transfer");
+    println!("  Device  : {}", config.alias);
+    println!("  Web URL : {}", local_url);
+    println!("  Save to : {:?}", config.download_dir);
+    println!("--------------------------------------------------");
 
     // Print ASCII QR code to terminal for fast phone scanning
     if let Ok(code) = QrCode::new(local_url.as_bytes()) {

@@ -16,16 +16,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentPendingSessionId = null;
 
-  // Format bytes into readable format
   function formatBytes(bytes) {
-    if (bytes === 0) return "0 B";
+    if (!bytes || bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   }
 
-  // 1. Fetch server info
+  // ── 1. Fetch server info ────────────────────────────────────────────────────
   async function fetchInfo() {
     try {
       const res = await fetch("/api/info");
@@ -39,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 2. Fetch shared files
+  // ── 2. Fetch shared files ───────────────────────────────────────────────────
   async function fetchFiles() {
     try {
       const res = await fetch("/api/files");
@@ -57,14 +56,12 @@ document.addEventListener("DOMContentLoaded", () => {
       filesList.innerHTML = `<div class="empty-state">No files currently shared</div>`;
       return;
     }
-
     filesList.innerHTML = "";
     files.forEach(file => {
       const item = document.createElement("div");
       item.className = "file-item";
       item.innerHTML = `
         <div class="file-info">
-          <span>📄</span>
           <div>
             <div class="file-name">${file.fileName}</div>
             <div class="file-size">${formatBytes(file.size)}</div>
@@ -76,10 +73,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 3. File upload handling
-  selectFilesBtn.addEventListener("click", () => fileInput.click());
+  // ── 3. File upload handling ─────────────────────────────────────────────────
+  function openPicker(e) {
+    if (e) e.stopPropagation();
+    try {
+      fileInput.value = "";
+    } catch (_) {}
+    fileInput.click();
+  }
+
+  selectFilesBtn.addEventListener("click", openPicker);
+
   dropzone.addEventListener("click", (e) => {
-    if (e.target !== selectFilesBtn) fileInput.click();
+    if (e.target !== selectFilesBtn) {
+      openPicker(e);
+    }
   });
 
   dropzone.addEventListener("dragover", (e) => {
@@ -94,72 +102,109 @@ document.addEventListener("DOMContentLoaded", () => {
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("drag-over");
-    if (e.dataTransfer.files.length > 0) {
-      uploadFiles(e.dataTransfer.files);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      uploadFiles(Array.from(e.dataTransfer.files));
     }
   });
 
   fileInput.addEventListener("change", () => {
-    if (fileInput.files.length > 0) {
-      uploadFiles(fileInput.files);
+    if (fileInput.files && fileInput.files.length > 0) {
+      const files = Array.from(fileInput.files);
+      uploadFiles(files);
     }
   });
 
-  function uploadFiles(files) {
-    uploadQueue.style.display = "block";
+  // Upload queue with dual-worker pipelining:
+  // - Creates UI rows immediately for ALL selected files so user sees instant reaction
+  // - Uploads max 2 files concurrently to prevent mobile Wi-Fi throttling and RAM freeze
+  async function uploadFiles(files) {
+    if (!files || files.length === 0) return;
 
-    Array.from(files).forEach(file => {
+    uploadQueue.style.display = "block";
+    uploadQueue.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    const queueEntries = files.map(file => {
       const queueItem = document.createElement("div");
       queueItem.className = "queue-item";
       queueItem.innerHTML = `
         <div class="queue-header">
           <span class="file-name">${file.name}</span>
-          <span class="progress-status">Uploading...</span>
+          <span class="progress-status">Queued (${formatBytes(file.size)})</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill"></div>
-        </div>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
       `;
       queueList.appendChild(queueItem);
 
-      const progressFill = queueItem.querySelector(".progress-fill");
-      const statusText = queueItem.querySelector(".progress-status");
+      return {
+        file,
+        progressFill: queueItem.querySelector(".progress-fill"),
+        statusText: queueItem.querySelector(".progress-status")
+      };
+    });
 
-      const xhr = new XMLHttpRequest();
+    let nextIndex = 0;
+    const concurrency = 2;
+
+    async function worker() {
+      while (nextIndex < queueEntries.length) {
+        const item = queueEntries[nextIndex++];
+        await uploadSingleFile(item.file, item.progressFill, item.statusText);
+      }
+    }
+
+    const workers = [];
+    const activeCount = Math.min(concurrency, queueEntries.length);
+    for (let i = 0; i < activeCount; i++) {
+      workers.push(worker());
+    }
+
+    await Promise.all(workers);
+    fetchFiles();
+  }
+
+  function uploadSingleFile(file, progressFill, statusText) {
+    return new Promise((resolve) => {
+      statusText.textContent = `Starting… (${formatBytes(file.size)})`;
+
       const formData = new FormData();
       formData.append("files", file);
 
+      const xhr = new XMLHttpRequest();
       const startTime = Date.now();
 
       xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          const now = Date.now();
-          const percent = Math.round((e.loaded / e.total) * 100);
-          progressFill.style.width = percent + "%";
-
-          const elapsedSec = (now - startTime) / 1000;
-          const speedBytesPerSec = elapsedSec > 0.1 ? (e.loaded / elapsedSec) : 0;
-          const speedFormatted = (speedBytesPerSec / (1024 * 1024)).toFixed(1) + " MB/s";
-
-          statusText.textContent = `${percent}% • ${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${speedFormatted})`;
+        if (e.lengthComputable && e.total > 0) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          progressFill.style.width = pct + "%";
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0.1 ? (e.loaded / elapsed / 1048576).toFixed(1) : "0";
+          statusText.textContent =
+            `${pct}% • ${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${speed} MB/s)`;
         }
       });
 
       xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          statusText.textContent = "✔ Done";
-          statusText.style.color = "var(--success)";
+          progressFill.style.width = "100%";
           progressFill.style.background = "var(--success)";
-          fetchFiles(); // refresh list
+          statusText.textContent = `Done (${formatBytes(file.size)})`;
+          statusText.style.color = "var(--success)";
         } else {
-          statusText.textContent = "✖ Failed";
+          statusText.textContent = `Failed (${xhr.status})`;
           statusText.style.color = "var(--danger)";
         }
+        resolve();
       });
 
       xhr.addEventListener("error", () => {
-        statusText.textContent = "✖ Network Error";
+        statusText.textContent = "Network error";
         statusText.style.color = "var(--danger)";
+        resolve();
+      });
+
+      xhr.addEventListener("abort", () => {
+        statusText.textContent = "Cancelled";
+        resolve();
       });
 
       xhr.open("POST", "/api/upload");
@@ -167,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 4. Server-Sent Events (SSE) for Real-Time Incoming Transfers
+  // ── 4. SSE for real-time incoming transfers ─────────────────────────────────
   function setupSSE() {
     const eventSource = new EventSource("/api/events");
 
@@ -179,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
         modalFileList.innerHTML = "";
         data.files.forEach(f => {
           const li = document.createElement("li");
-          li.textContent = `${f.fileName} (${formatBytes(f.size)})`;
+          li.textContent = `${f.fileName}  (${formatBytes(f.size)})`;
           modalFileList.appendChild(li);
         });
         requestModal.style.display = "flex";
@@ -188,13 +233,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    eventSource.addEventListener("files_updated", () => {
-      fetchFiles();
-    });
+    eventSource.addEventListener("files_updated", () => fetchFiles());
 
-    eventSource.onerror = () => {
-      setTimeout(setupSSE, 3000);
-    };
+    eventSource.onerror = () => setTimeout(setupSSE, 3000);
   }
 
   acceptBtn.addEventListener("click", async () => {
@@ -232,4 +273,3 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchFiles();
   setupSSE();
 });
-
