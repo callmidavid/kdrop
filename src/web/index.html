@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>kdrop — Local File Share</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <span class="icon">💧</span>
+        <span class="title">kdrop</span>
+      </div>
+      <div class="device-badge" id="hostDeviceBadge">
+        <span class="status-dot"></span>
+        <span id="hostAlias">Connecting...</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Send Files to Host -->
+      <section class="card upload-card">
+        <h2>Send to <span id="targetName">Device</span></h2>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" multiple style="display: none;">
+          <div class="dropzone-content">
+            <span class="upload-icon">📤</span>
+            <p class="dropzone-text">Tap to select or drop files here</p>
+            <button class="btn btn-primary" id="selectFilesBtn">Choose Files</button>
+          </div>
+        </div>
+
+        <div class="upload-queue" id="uploadQueue" style="display: none;">
+          <h3>Transfer Progress</h3>
+          <div id="queueList"></div>
+        </div>
+      </section>
+
+      <!-- Available Files to Download -->
+      <section class="card files-card">
+        <div class="card-header">
+          <h2>Shared Files</h2>
+          <button class="btn btn-secondary btn-sm" id="refreshFilesBtn">Refresh</button>
+        </div>
+        <div class="files-list" id="filesList">
+          <div class="empty-state">No files currently shared</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Transfer Request Modal -->
+    <div class="modal-backdrop" id="requestModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-icon">📥</div>
+        <h3>Incoming Transfer</h3>
+        <p><strong id="modalSender">Device</strong> wants to send you files:</p>
+        <ul class="file-preview-list" id="modalFileList"></ul>
+        <div class="modal-actions">
+          <button class="btn btn-danger" id="declineBtn">Decline</button>
+          <button class="btn btn-success" id="acceptBtn">Accept</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+
