@@ -154,9 +154,9 @@ impl TransferManager {
         let mut bytes_accumulated = 0u64;
 
         for (idx, (path, info)) in file_infos.into_iter().enumerate() {
-            let file_bytes = tokio::fs::read(&path)
+            let file = tokio::fs::File::open(&path)
                 .await
-                .with_context(|| format!("Failed to read file {:?}", path))?;
+                .with_context(|| format!("Failed to open file {:?}", path))?;
 
             progress_callback(TransferProgress::Transferring {
                 file_name: info.file_name.clone(),
@@ -166,11 +166,15 @@ impl TransferManager {
                 total_bytes,
             });
 
+            let stream = tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024);
+            let body = reqwest::Body::wrap_stream(stream);
+
             let upload_url = format!("{}/api/receive/{}/{}", base_url, session_id, info.id);
             let send_res = self
                 .client
                 .post(upload_url)
-                .body(file_bytes)
+                .header(reqwest::header::CONTENT_LENGTH, info.size)
+                .body(body)
                 .send()
                 .await
                 .context("Failed while streaming file to recipient")?;

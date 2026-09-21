@@ -2,8 +2,8 @@ use crate::config::Config;
 use crate::peer::{FileInfo, PendingSession, PeerRegistry};
 use anyhow::Result;
 use axum::{
-    body::Bytes,
-    extract::{Multipart, Path, State},
+    body::Body,
+    extract::{DefaultBodyLimit, Multipart, Path, State},
     http::{header, StatusCode},
     response::{sse::Event, IntoResponse, Response, Sse},
     routing::{get, post},
@@ -19,11 +19,12 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 // Embedded static web UI files
@@ -140,6 +141,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/send/confirm/:session_id", post(handle_confirm))
         .route("/api/receive/:session_id/:file_id", post(handle_receive_file))
         .route("/api/events", get(sse_handler))
+        .layer(DefaultBodyLimit::disable())
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -199,10 +201,13 @@ async fn download_file(
     };
 
     if let Some(item) = file_opt {
-        if let Ok(bytes) = tokio::fs::read(&item.path).await {
+        if let Ok(file) = tokio::fs::File::open(&item.path).await {
             let mime = mime_guess::from_path(&item.path)
                 .first_or_octet_stream()
                 .to_string();
+
+            let stream = tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024);
+            let body = Body::from_stream(stream);
 
             return (
                 [
@@ -211,8 +216,12 @@ async fn download_file(
                         header::CONTENT_DISPOSITION,
                         format!("attachment; filename=\"{}\"", item.file_name),
                     ),
+                    (
+                        header::CONTENT_LENGTH,
+                        item.size.to_string(),
+                    ),
                 ],
-                bytes,
+                body,
             )
                 .into_response();
         }
@@ -230,16 +239,34 @@ async fn handle_upload(
 
     let mut saved_any = false;
 
-    while let Ok(Some(field)) = multipart.next_field().await {
-        let file_name = field
+    while let Ok(Some(mut field)) = multipart.next_field().await {
+        let raw_name = field
             .file_name()
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("upload-{}", Uuid::new_v4()));
 
-        if let Ok(data) = field.bytes().await {
-            let target_path = download_dir.join(&file_name);
-            if let Ok(_) = tokio::fs::write(&target_path, &data).await {
-                info!("Saved uploaded file: {:?}", target_path);
+        let file_name = std::path::Path::new(&raw_name)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("file")
+            .to_string();
+
+        let target_path = download_dir.join(&file_name);
+
+        if let Ok(file) = tokio::fs::File::create(&target_path).await {
+            let mut writer = tokio::io::BufWriter::with_capacity(512 * 1024, file);
+            let mut failed = false;
+
+            while let Ok(Some(chunk)) = field.chunk().await {
+                if let Err(e) = writer.write_all(&chunk).await {
+                    error!("Failed writing upload chunk to {:?}: {}", target_path, e);
+                    failed = true;
+                    break;
+                }
+            }
+
+            if !failed && writer.flush().await.is_ok() {
+                info!("Saved uploaded file (streamed to disk): {:?}", target_path);
                 let _ = state.add_shared_file(target_path);
                 saved_any = true;
             }
@@ -319,7 +346,7 @@ async fn handle_confirm(
 async fn handle_receive_file(
     State(state): State<AppState>,
     Path((session_id, file_id)): Path<(String, String)>,
-    body: Bytes,
+    body: Body,
 ) -> impl IntoResponse {
     let file_info = {
         let sessions = state.pending_sessions.lock().unwrap();
@@ -333,10 +360,33 @@ async fn handle_receive_file(
         let _ = tokio::fs::create_dir_all(&download_dir).await;
 
         let target_path = download_dir.join(&info.file_name);
-        if let Ok(_) = tokio::fs::write(&target_path, body).await {
-            info!("Received and saved file: {:?}", target_path);
-            let _ = state.add_shared_file(target_path);
-            return StatusCode::OK;
+        if let Ok(file) = tokio::fs::File::create(&target_path).await {
+            let mut writer = tokio::io::BufWriter::with_capacity(512 * 1024, file);
+            let mut stream = body.into_data_stream();
+            let mut failed = false;
+
+            while let Some(chunk_res) = stream.next().await {
+                match chunk_res {
+                    Ok(chunk) => {
+                        if let Err(e) = writer.write_all(&chunk).await {
+                            error!("Error writing file stream chunk: {}", e);
+                            failed = true;
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error reading incoming stream: {}", e);
+                        failed = true;
+                        break;
+                    }
+                }
+            }
+
+            if !failed && writer.flush().await.is_ok() {
+                info!("Received and saved file (streamed to disk): {:?}", target_path);
+                let _ = state.add_shared_file(target_path);
+                return StatusCode::OK;
+            }
         }
     }
 

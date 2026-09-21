@@ -6,7 +6,7 @@
 
 Share files, photos, videos, and documents seamlessly across **Linux, iPhone, Android, Windows, and macOS** on the same Wi-Fi network. No internet connection, no third-party servers, no accounts, and no cables.
 
-[![Release](https://img.shields.io/github/v/release/kafy-os/kdrop?color=blue&logo=github)](https://github.com/kafy-os/kdrop/releases)
+[![Release](https://img.shields.io/github/v/release/callmidavid/kdrop?color=blue&logo=github)](https://github.com/callmidavid/kdrop/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20iOS%20%7C%20Android-purple)](#downloads)
 
@@ -14,14 +14,14 @@ Share files, photos, videos, and documents seamlessly across **Linux, iPhone, An
 
 ---
 
-## ⚡ Touch-to-Transfer (AirDrop-Style Proximity)
+## Touch-to-Transfer (AirDrop-Style Proximity)
 
 kdrop features **hardware-free proximity sensing** using Bluetooth Low Energy (BLE) signal strength (RSSI).
 
 - **Bring to Bump:** Place your iPhone or Android phone right beside your laptop (< 20 cm).
 - **Instant Detection:** kdrop senses the radio signal spike (`> -44 dBm`) using an Exponential Moving Average (EMA) filter.
 - **1-Click Drop:** The app immediately illuminates with a glowing **⚡ Device Bump** banner:
-  > _"⚡ Device Bump: 'iPhone 15' is right beside laptop! [⚡ Drop Files]"_
+  > _"Device Bump: 'iPhone 15' is right beside laptop! [Drop Files]"_
 - Click **Drop Files**, and your transfer begins instantly without having to browse device lists or scan codes.
 
 ---
@@ -30,14 +30,14 @@ kdrop features **hardware-free proximity sensing** using Bluetooth Low Energy (B
 
 Pre-built binaries are ready for instant download on the [**GitHub Releases**](https://github.com/kafy-os/kdrop/releases) page.
 
-| Platform                              | Format                                                                   | Description                                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| **Linux (Debian / Ubuntu / Kafy OS)** | [`.deb Package`](https://github.com/kafy-os/kdrop/releases/latest)       | Installs system-wide with application launcher and desktop icon.            |
-| **Linux (Universal)**                 | [`.tar.gz Standalone`](https://github.com/kafy-os/kdrop/releases/latest) | Portable x86_64 binary. Extract and double-click to run.                    |
-| **Windows**                           | [`.zip (kdrop.exe)`](https://github.com/kafy-os/kdrop/releases/latest)   | Portable Windows executable for Windows 10 & 11.                            |
-| **macOS**                             | [`.tar.gz`](https://github.com/kafy-os/kdrop/releases/latest)            | Universal binary for Apple Silicon (M1/M2/M3) and Intel Macs.               |
-| **iOS (iPhone / iPad)**               | **No App Required**                                                      | Open Safari and scan the QR code or navigate to `http://<laptop-ip>:53317`. |
-| **Android**                           | **No App Required**                                                      | Open Chrome and scan the QR code or navigate to `http://<laptop-ip>:53317`. |
+| Platform                              | Format                                                                       | Description                                                                 |
+| ------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Linux (Debian / Ubuntu / Kafy OS)** | [`.deb Package`](https://github.com/callmidavid/kdrop/releases/latest)       | Installs system-wide with application launcher and desktop icon.            |
+| **Linux (Universal)**                 | [`.tar.gz Standalone`](https://github.com/callmidavid/kdrop/releases/latest) | Portable x86_64 binary. Extract and double-click to run.                    |
+| **Windows**                           | [`.zip (kdrop.exe)`](https://github.com/callmidavid/kdrop/releases/latest)   | Portable Windows executable for Windows 10 & 11.                            |
+| **macOS**                             | [`.tar.gz`](https://github.com/callmidavid/kdrop/releases/latest)            | Universal binary for Apple Silicon (M1/M2/M3) and Intel Macs.               |
+| **iOS (iPhone / iPad)**               | **No App Required**                                                          | Open Safari and scan the QR code or navigate to `http://<laptop-ip>:53317`. |
+| **Android**                           | **No App Required**                                                          | Open Chrome and scan the QR code or navigate to `http://<laptop-ip>:53317`. |
 
 ### Linux Quick Install via Terminal (.deb):
 
@@ -80,7 +80,7 @@ kdrop uses a decentralized, peer-to-peer architecture inspired by LocalSend and 
 
 - When a sender clicks **Send Files** or triggers the **Bump** gesture, it sends a `POST /api/send/request` with file metadata (names, types, byte sizes).
 - The receiving device displays a confirmation modal:
-  > _"King's PC wants to send 3 photos (12.4 MB). [Decline] [Accept]"_
+  > _"Dave's PC wants to send 3 photos (12.4 MB). [Decline] [Accept]"_
 
 ### 3. Transfer Phase
 
@@ -106,26 +106,6 @@ You don't need to install anything from the App Store or Google Play:
 - **Local Network:** Both devices must be connected to the same Wi-Fi router or mobile hotspot.
 - **Port 53317:** Ensure firewall rules permit TCP & UDP traffic on port `53317`.
 - **AP / Client Isolation:** In university, hotel, or public guest Wi-Fi networks, routers often turn on _Client Isolation_ (blocking devices from seeing each other). If this happens, connect both devices to a portable Wi-Fi hotspot.
-
----
-
-## 🛠️ Building from Source (Developers)
-
-If you'd like to build kdrop yourself:
-
-```bash
-# Clone the repository
-git clone https://github.com/kafy-os/kdrop.git
-cd kdrop
-
-# Run native GUI
-cargo run --release
-
-# Run in headless server mode (prints QR code directly in terminal)
-cargo run --release -- --headless
-```
-
----
 
 ## 📄 License
 

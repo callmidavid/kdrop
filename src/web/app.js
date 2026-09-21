@@ -129,11 +129,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const formData = new FormData();
       formData.append("files", file);
 
+      const startTime = Date.now();
+
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
+          const now = Date.now();
           const percent = Math.round((e.loaded / e.total) * 100);
           progressFill.style.width = percent + "%";
-          statusText.textContent = `${percent}% (${formatBytes(e.loaded)} / ${formatBytes(e.total)})`;
+
+          const elapsedSec = (now - startTime) / 1000;
+          const speedBytesPerSec = elapsedSec > 0.1 ? (e.loaded / elapsedSec) : 0;
+          const speedFormatted = (speedBytesPerSec / (1024 * 1024)).toFixed(1) + " MB/s";
+
+          statusText.textContent = `${percent}% • ${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${speedFormatted})`;
         }
       });
 
