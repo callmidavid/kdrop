@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+#[cfg(not(target_os = "linux"))]
+use tracing::debug;
+#[cfg(target_os = "linux")]
 use tracing::{info, warn};
 
 /// Proximity classifications based on calibrated BLE RSSI values.

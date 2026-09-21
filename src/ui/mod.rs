@@ -53,14 +53,14 @@ impl KdropApp {
         style.visuals.faint_bg_color = PANEL;
 
         style.visuals.widgets.noninteractive.bg_fill = CARD;
-        style.visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, CARD_BORDER);
-        style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, TEXT_MUTED);
+        style.visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, CARD_BORDER);
+        style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, TEXT_MUTED);
         style.visuals.widgets.inactive.bg_fill = CARD;
-        style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, CARD_BORDER);
+        style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0_f32, CARD_BORDER);
         style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(72, 72, 74);
-        style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, ACCENT);
+        style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0_f32, ACCENT);
         style.visuals.widgets.active.bg_fill = ACCENT;
-        style.visuals.widgets.active.bg_stroke = egui::Stroke::new(0.0, ACCENT);
+        style.visuals.widgets.active.bg_stroke = egui::Stroke::new(0.0_f32, ACCENT);
 
         style.visuals.widgets.noninteractive.rounding = egui::Rounding::same(8.0);
         style.visuals.widgets.inactive.rounding = egui::Rounding::same(8.0);
@@ -175,7 +175,7 @@ impl KdropApp {
         ui.add(
             egui::Button::new(egui::RichText::new(label).color(TEXT_PRIMARY))
                 .fill(CARD)
-                .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                 .rounding(egui::Rounding::same(8.0)),
         )
         .clicked()
@@ -202,7 +202,7 @@ impl eframe::App for KdropApp {
                 egui::Frame::none()
                     .fill(PANEL)
                     .inner_margin(egui::Margin::symmetric(20.0, 12.0))
-                    .stroke(egui::Stroke::new(1.0, SEPARATOR)),
+                    .stroke(egui::Stroke::new(1.0_f32, SEPARATOR)),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -252,7 +252,7 @@ impl eframe::App for KdropApp {
                         if let Some(bumped) = self.proximity_tracker.get_bumped_device() {
                             egui::Frame::none()
                                 .fill(ACCENT.gamma_multiply(0.12))
-                                .stroke(egui::Stroke::new(1.0, ACCENT))
+                                .stroke(egui::Stroke::new(1.0_f32, ACCENT))
                                 .rounding(egui::Rounding::same(12.0))
                                 .inner_margin(egui::Margin::same(14.0))
                                 .show(ui, |ui| {
@@ -294,7 +294,7 @@ impl eframe::App for KdropApp {
                         if let Some(progress) = progress_opt {
                             egui::Frame::none()
                                 .fill(CARD)
-                                .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                                .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                                 .rounding(egui::Rounding::same(12.0))
                                 .inner_margin(egui::Margin::same(14.0))
                                 .show(ui, |ui| {
@@ -343,7 +343,7 @@ impl eframe::App for KdropApp {
                         if peers.is_empty() {
                             egui::Frame::none()
                                 .fill(CARD)
-                                .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                                .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                                 .rounding(egui::Rounding::same(12.0))
                                 .inner_margin(egui::Margin::same(24.0))
                                 .show(ui, |ui| {
@@ -360,7 +360,7 @@ impl eframe::App for KdropApp {
                             for peer in &peers {
                                 egui::Frame::none()
                                     .fill(CARD)
-                                    .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                                    .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                                     .rounding(egui::Rounding::same(12.0))
                                     .inner_margin(egui::Margin::same(14.0))
                                     .show(ui, |ui| {
@@ -416,7 +416,7 @@ impl eframe::App for KdropApp {
                         if shared_files.is_empty() {
                             egui::Frame::none()
                                 .fill(CARD)
-                                .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                                .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                                 .rounding(egui::Rounding::same(12.0))
                                 .inner_margin(egui::Margin::same(14.0))
                                 .show(ui, |ui| {
@@ -431,7 +431,7 @@ impl eframe::App for KdropApp {
                                     for (i, file) in shared_files.iter().enumerate() {
                                         egui::Frame::none()
                                             .fill(CARD)
-                                            .stroke(egui::Stroke::new(1.0, CARD_BORDER))
+                                            .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
                                             .rounding(egui::Rounding::same(10.0))
                                             .inner_margin(egui::Margin::symmetric(14.0, 10.0))
                                             .show(ui, |ui| {
@@ -465,7 +465,7 @@ impl eframe::App for KdropApp {
                 .frame(
                     egui::Frame::window(&ctx.style())
                         .fill(egui::Color32::from_rgb(36, 36, 38))
-                        .stroke(egui::Stroke::new(1.0, SEPARATOR))
+                        .stroke(egui::Stroke::new(1.0_f32, SEPARATOR))
                         .rounding(egui::Rounding::same(16.0))
                         .inner_margin(egui::Margin::same(24.0)),
                 )
@@ -549,7 +549,7 @@ impl eframe::App for KdropApp {
                 .frame(
                     egui::Frame::window(&ctx.style())
                         .fill(egui::Color32::from_rgb(36, 36, 38))
-                        .stroke(egui::Stroke::new(1.0, SEPARATOR))
+                        .stroke(egui::Stroke::new(1.0_f32, SEPARATOR))
                         .rounding(egui::Rounding::same(16.0))
                         .inner_margin(egui::Margin::same(24.0)),
                 )
