@@ -141,7 +141,10 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
             let session = match bluer::Session::new().await {
                 Ok(s) => s,
                 Err(e) => {
-                    warn!("Bluetooth D-Bus session unavailable: {}. Proximity sensing disabled.", e);
+                    warn!(
+                        "Bluetooth D-Bus session unavailable: {}. Proximity sensing disabled.",
+                        e
+                    );
                     return;
                 }
             };
@@ -149,7 +152,10 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
             let adapter = match session.default_adapter().await {
                 Ok(a) => a,
                 Err(e) => {
-                    warn!("No Bluetooth adapter found (hci0): {}. Proximity sensing disabled.", e);
+                    warn!(
+                        "No Bluetooth adapter found (hci0): {}. Proximity sensing disabled.",
+                        e
+                    );
                     return;
                 }
             };
@@ -158,7 +164,10 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
                 warn!("Could not power on Bluetooth adapter: {}", e);
             }
 
-            info!("Bluetooth adapter '{}' active. Starting passive BLE discovery...", adapter.name());
+            info!(
+                "Bluetooth adapter '{}' active. Starting passive BLE discovery...",
+                adapter.name()
+            );
 
             let mut discover_events = match adapter.discover_devices().await {
                 Ok(stream) => stream,
@@ -170,16 +179,13 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
 
             use futures::StreamExt;
             while let Some(event) = discover_events.next().await {
-                match event {
-                    bluer::AdapterEvent::DeviceAdded(addr) => {
-                        if let Ok(dev) = adapter.device(addr) {
-                            if let Ok(Some(rssi)) = dev.rssi().await {
-                                let name = dev.name().await.ok().flatten();
-                                scan_tracker.record_observation(addr.to_string(), name, rssi);
-                            }
+                if let bluer::AdapterEvent::DeviceAdded(addr) = event {
+                    if let Ok(dev) = adapter.device(addr) {
+                        if let Ok(Some(rssi)) = dev.rssi().await {
+                            let name = dev.name().await.ok().flatten();
+                            scan_tracker.record_observation(addr.to_string(), name, rssi);
                         }
                     }
-                    _ => {}
                 }
             }
         });
@@ -201,4 +207,3 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
         debug!("BLE proximity scanning not supported on this platform.");
     }
 }
-

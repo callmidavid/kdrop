@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::peer::{FileInfo, PendingSession, PeerRegistry};
+use crate::peer::{FileInfo, PeerRegistry, PendingSession};
 use anyhow::Result;
 use axum::{
     body::Body,
@@ -22,7 +22,6 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -73,10 +72,7 @@ pub enum AppEvent {
         files: Vec<FileInfo>,
     },
     #[serde(rename = "transfer_decision")]
-    TransferDecision {
-        session_id: String,
-        accepted: bool,
-    },
+    TransferDecision { session_id: String, accepted: bool },
     #[serde(rename = "files_updated")]
     FilesUpdated,
 }
@@ -141,7 +137,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/send/request", post(handle_send_request))
         .route("/api/send/status/:session_id", get(handle_check_status))
         .route("/api/send/confirm/:session_id", post(handle_confirm))
-        .route("/api/receive/:session_id/:file_id", post(handle_receive_file))
+        .route(
+            "/api/receive/:session_id/:file_id",
+            post(handle_receive_file),
+        )
         .route("/api/events", get(sse_handler))
         .layer(DefaultBodyLimit::disable())
         .layer(CorsLayer::permissive())
@@ -150,22 +149,31 @@ pub fn create_router(state: AppState) -> Router {
 
 // Handler implementations
 async fn serve_index() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], INDEX_HTML)
+    (
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        INDEX_HTML,
+    )
 }
 
 async fn serve_css() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], STYLE_CSS)
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        STYLE_CSS,
+    )
 }
 
 async fn serve_js() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8")], APP_JS)
+    (
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
+        APP_JS,
+    )
 }
 
 async fn serve_logo() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "image/png")],
-        LOGO_PNG,
-    )
+    ([(header::CONTENT_TYPE, "image/png")], LOGO_PNG)
 }
 
 async fn serve_qr(State(state): State<AppState>) -> impl IntoResponse {
@@ -175,10 +183,7 @@ async fn serve_qr(State(state): State<AppState>) -> impl IntoResponse {
 
     let mut buffer = Cursor::new(Vec::new());
     if img.write_to(&mut buffer, image::ImageFormat::Png).is_ok() {
-        (
-            [(header::CONTENT_TYPE, "image/png")],
-            buffer.into_inner(),
-        ).into_response()
+        ([(header::CONTENT_TYPE, "image/png")], buffer.into_inner()).into_response()
     } else {
         (StatusCode::INTERNAL_SERVER_ERROR, "Failed to render QR").into_response()
     }
@@ -200,10 +205,7 @@ async fn list_files(State(state): State<AppState>) -> Json<Vec<SharedFileItem>> 
     Json(files)
 }
 
-async fn download_file(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn download_file(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let file_opt = {
         let files = state.shared_files.lock().unwrap();
         files.iter().find(|f| f.id == id).cloned()
@@ -225,10 +227,7 @@ async fn download_file(
                         header::CONTENT_DISPOSITION,
                         format!("attachment; filename=\"{}\"", item.file_name),
                     ),
-                    (
-                        header::CONTENT_LENGTH,
-                        item.size.to_string(),
-                    ),
+                    (header::CONTENT_LENGTH, item.size.to_string()),
                 ],
                 body,
             )
@@ -357,6 +356,7 @@ async fn handle_receive_file(
     Path((session_id, file_id)): Path<(String, String)>,
     body: Body,
 ) -> impl IntoResponse {
+    // 1. Retrieve file info safely
     let file_info = {
         let sessions = state.pending_sessions.lock().unwrap();
         sessions
@@ -364,82 +364,103 @@ async fn handle_receive_file(
             .and_then(|s| s.files.iter().find(|f| f.id == file_id).cloned())
     };
 
-    if let Some(info) = file_info {
-        let download_dir = state.config.download_dir.clone();
-        let _ = tokio::fs::create_dir_all(&download_dir).await;
+    // Return 404 if the session or file metadata doesn't exist
+    let info = match file_info {
+        Some(info) => info,
+        None => return StatusCode::NOT_FOUND,
+    };
 
-        let target_path = download_dir.join(&info.file_name);
-        if let Ok(file) = tokio::fs::File::create(&target_path).await {
-            let mut writer = tokio::io::BufWriter::with_capacity(512 * 1024, file);
-            let mut stream = body.into_data_stream();
-            let mut failed = false;
+    // 2. Prevent path traversal attacks by extracting only the file name
+    let safe_file_name = match std::path::Path::new(&info.file_name).file_name() {
+        Some(name) => name,
+        None => return StatusCode::BAD_REQUEST,
+    };
 
-            while let Some(chunk_res) = stream.next().await {
-                match chunk_res {
-                    Ok(chunk) => {
-                        if let Err(e) = writer.write_all(&chunk).await {
-                            error!("Error writing file stream chunk: {}", e);
-                            failed = true;
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error reading incoming stream: {}", e);
-                        failed = true;
-                        break;
-                    }
+    let download_dir = state.config.download_dir.clone();
+    if let Err(e) = tokio::fs::create_dir_all(&download_dir).await {
+        error!("Failed to create download directory: {}", e);
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    let target_path = download_dir.join(safe_file_name);
+
+    // 3. Open file and stream chunks directly to disk
+    let file = match tokio::fs::File::create(&target_path).await {
+        Ok(f) => f,
+        Err(e) => {
+            error!("Failed to create target file {:?}: {}", target_path, e);
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+
+    let mut writer = tokio::io::BufWriter::with_capacity(512 * 1024, file);
+    let mut stream = body.into_data_stream();
+
+    use futures::StreamExt;
+    while let Some(chunk_res) = stream.next().await {
+        match chunk_res {
+            Ok(chunk) => {
+                if let Err(e) = writer.write_all(&chunk).await {
+                    error!("Error writing file stream chunk: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR;
                 }
             }
-
-            if !failed && writer.flush().await.is_ok() {
-                info!("Received and saved file (streamed to disk): {:?}", target_path);
-                let _ = state.add_shared_file(target_path);
-                return StatusCode::OK;
+            Err(e) => {
+                error!("Error reading incoming stream: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR;
             }
         }
     }
 
-    StatusCode::INTERNAL_SERVER_ERROR
+    // Ensure all data is fully flushed to disk
+    if let Err(e) = writer.flush().await {
+        error!("Failed to flush file to disk: {}", e);
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    info!("Received and saved file: {:?}", target_path);
+    let _ = state.add_shared_file(target_path);
+
+    StatusCode::OK
 }
 
 async fn sse_handler(
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = state.event_tx.subscribe();
-    let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
-        match msg {
-            Ok(event) => match event {
-                AppEvent::TransferRequest {
-                    session_id,
-                    sender_alias,
-                    files,
-                } => {
-                    let data = serde_json::json!({
-                        "sessionId": session_id,
-                        "senderAlias": sender_alias,
-                        "files": files
-                    });
-                    Some(Ok(Event::default()
-                        .event("transfer_request")
-                        .data(data.to_string())))
-                }
-                AppEvent::TransferDecision {
-                    session_id,
-                    accepted,
-                } => {
-                    let data = serde_json::json!({
-                        "sessionId": session_id,
-                        "accepted": accepted
-                    });
-                    Some(Ok(Event::default()
-                        .event("transfer_decision")
-                        .data(data.to_string())))
-                }
-                AppEvent::FilesUpdated => Some(Ok(Event::default().event("files_updated").data("{}"))),
-            },
-            Err(_) => None,
-        }
+    let stream = tokio_stream::StreamExt::filter_map(BroadcastStream::new(rx), |msg| match msg {
+        Ok(event) => match event {
+            AppEvent::TransferRequest {
+                session_id,
+                sender_alias,
+                files,
+            } => {
+                let data = serde_json::json!({
+                    "sessionId": session_id,
+                    "senderAlias": sender_alias,
+                    "files": files
+                });
+                Some(Ok(Event::default()
+                    .event("transfer_request")
+                    .data(data.to_string())))
+            }
+            AppEvent::TransferDecision {
+                session_id,
+                accepted,
+            } => {
+                let data = serde_json::json!({
+                    "sessionId": session_id,
+                    "accepted": accepted
+                });
+                Some(Ok(Event::default()
+                    .event("transfer_decision")
+                    .data(data.to_string())))
+            }
+            AppEvent::FilesUpdated => Some(Ok(Event::default().event("files_updated").data("{}"))),
+        },
+        Err(_) => None,
     });
 
-    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)))
+    Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)))
 }

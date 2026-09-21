@@ -1,4 +1,6 @@
-use crate::config::{Config, ANNOUNCE_INTERVAL_SECS, KDROP_PORT, MULTICAST_ADDR, PEER_TTL_SECS, PROTOCOL_VERSION};
+use crate::config::{
+    Config, ANNOUNCE_INTERVAL_SECS, KDROP_PORT, MULTICAST_ADDR, PEER_TTL_SECS, PROTOCOL_VERSION,
+};
 use crate::peer::{Announcement, Peer, PeerRegistry};
 use anyhow::{Context, Result};
 use socket2::{Domain, Protocol, Socket, Type};
@@ -13,12 +15,18 @@ fn create_multicast_socket(addr: Ipv4Addr, port: u16) -> Result<std::net::UdpSoc
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))
         .context("Failed to create UDP socket")?;
 
-    socket.set_reuse_address(true).context("Failed to set SO_REUSEADDR")?;
+    socket
+        .set_reuse_address(true)
+        .context("Failed to set SO_REUSEADDR")?;
 
-    socket.set_nonblocking(true).context("Failed to set non-blocking")?;
+    socket
+        .set_nonblocking(true)
+        .context("Failed to set non-blocking")?;
 
     let bind_addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port);
-    socket.bind(&bind_addr.into()).context("Failed to bind UDP socket")?;
+    socket
+        .bind(&bind_addr.into())
+        .context("Failed to bind UDP socket")?;
 
     socket
         .join_multicast_v4(&addr, &Ipv4Addr::UNSPECIFIED)
@@ -74,7 +82,10 @@ pub fn start_discovery(config: Arc<Config>, registry: PeerRegistry) -> Result<()
 
     tokio::spawn(async move {
         let mut buf = [0u8; 4096];
-        info!("Discovery listener active on {}:{}", MULTICAST_ADDR, KDROP_PORT);
+        info!(
+            "Discovery listener active on {}:{}",
+            MULTICAST_ADDR, KDROP_PORT
+        );
 
         loop {
             match recv_socket.recv_from(&mut buf).await {
@@ -91,7 +102,13 @@ pub fn start_discovery(config: Arc<Config>, registry: PeerRegistry) -> Result<()
                         };
 
                         if announcement.announce {
-                            debug!("Discovered peer: {} ({}) at {}:{}", announcement.alias, announcement.device_model, ip, announcement.port);
+                            debug!(
+                                "Discovered peer: {} ({}) at {}:{}",
+                                announcement.alias,
+                                announcement.device_model,
+                                ip,
+                                announcement.port
+                            );
                             recv_registry.upsert(Peer {
                                 alias: announcement.alias,
                                 device_model: announcement.device_model,
@@ -126,4 +143,3 @@ pub fn start_discovery(config: Arc<Config>, registry: PeerRegistry) -> Result<()
 
     Ok(())
 }
-

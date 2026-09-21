@@ -32,7 +32,10 @@ async fn main() -> Result<()> {
     let app_state = AppState::new(config.clone(), registry.clone());
     let proximity_tracker = Arc::new(ProximityTracker::new());
 
-    info!("Starting kdrop for '{}' ({})", config.alias, config.fingerprint);
+    info!(
+        "Starting kdrop for '{}' ({})",
+        config.alias, config.fingerprint
+    );
 
     // 2. Start mDNS / Multicast UDP discovery service
     if let Err(e) = start_discovery(config.clone(), registry.clone()) {
@@ -96,12 +99,9 @@ async fn main() -> Result<()> {
         let _ = eframe::run_native(
             "kdrop",
             native_options,
-            Box::new(move |cc| {
-                Box::new(KdropApp::new(cc, app_config, app_reg, app_st, app_prox))
-            }),
+            Box::new(move |cc| Box::new(KdropApp::new(cc, app_config, app_reg, app_st, app_prox))),
         );
     }
 
     Ok(())
 }
-

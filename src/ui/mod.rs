@@ -120,7 +120,13 @@ impl KdropApp {
             let pixels: Vec<egui::Color32> = img
                 .into_raw()
                 .into_iter()
-                .map(|p| if p == 0 { egui::Color32::BLACK } else { egui::Color32::WHITE })
+                .map(|p| {
+                    if p == 0 {
+                        egui::Color32::BLACK
+                    } else {
+                        egui::Color32::WHITE
+                    }
+                })
                 .collect();
             self.qr_texture = Some(ctx.load_texture(
                 "qr_code",
@@ -141,18 +147,26 @@ impl KdropApp {
 
     fn accent_button(ui: &mut egui::Ui, label: &str) -> bool {
         ui.add(
-            egui::Button::new(egui::RichText::new(label).color(egui::Color32::WHITE).strong())
-                .fill(ACCENT)
-                .rounding(egui::Rounding::same(8.0)),
+            egui::Button::new(
+                egui::RichText::new(label)
+                    .color(egui::Color32::WHITE)
+                    .strong(),
+            )
+            .fill(ACCENT)
+            .rounding(egui::Rounding::same(8.0)),
         )
         .clicked()
     }
 
     fn danger_button(ui: &mut egui::Ui, label: &str) -> bool {
         ui.add(
-            egui::Button::new(egui::RichText::new(label).color(egui::Color32::WHITE).strong())
-                .fill(DANGER)
-                .rounding(egui::Rounding::same(8.0)),
+            egui::Button::new(
+                egui::RichText::new(label)
+                    .color(egui::Color32::WHITE)
+                    .strong(),
+            )
+            .fill(DANGER)
+            .rounding(egui::Rounding::same(8.0)),
         )
         .clicked()
     }
@@ -193,11 +207,17 @@ impl eframe::App for KdropApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if let Some(tex) = &self.logo_texture {
-                        ui.image(egui::load::SizedTexture::new(tex.id(), egui::vec2(20.0, 20.0)));
+                        ui.image(egui::load::SizedTexture::new(
+                            tex.id(),
+                            egui::vec2(20.0, 20.0),
+                        ));
                         ui.add_space(4.0);
                     }
                     ui.label(
-                        egui::RichText::new("kdrop").size(16.0).strong().color(TEXT_PRIMARY),
+                        egui::RichText::new("kdrop")
+                            .size(16.0)
+                            .strong()
+                            .color(TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if Self::ghost_button(ui, "Share via QR") {
@@ -451,9 +471,22 @@ impl eframe::App for KdropApp {
                 )
                 .show(ctx, |ui| {
                     ui.set_min_width(340.0);
-                    ui.label(egui::RichText::new("Incoming Transfer").size(18.0).strong().color(TEXT_PRIMARY));
+                    ui.label(
+                        egui::RichText::new("Incoming Transfer")
+                            .size(18.0)
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
                     ui.add_space(4.0);
-                    ui.label(egui::RichText::new(format!("'{}' wants to send you {} file(s)", session.sender_alias, session.files.len())).size(13.0).color(TEXT_MUTED));
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "'{}' wants to send you {} file(s)",
+                            session.sender_alias,
+                            session.files.len()
+                        ))
+                        .size(13.0)
+                        .color(TEXT_MUTED),
+                    );
                     ui.add_space(10.0);
                     egui::Frame::none()
                         .fill(CARD)
@@ -462,20 +495,46 @@ impl eframe::App for KdropApp {
                         .show(ui, |ui| {
                             ui.set_min_width(292.0);
                             for file in &session.files {
-                                ui.label(egui::RichText::new(format!("{}   ({:.1} MB)", file.file_name, file.size as f64 / 1e6)).size(12.0).color(TEXT_PRIMARY));
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "{}   ({:.1} MB)",
+                                        file.file_name,
+                                        file.size as f64 / 1e6
+                                    ))
+                                    .size(12.0)
+                                    .color(TEXT_PRIMARY),
+                                );
                             }
                         });
                     ui.add_space(16.0);
                     ui.horizontal(|ui| {
                         if Self::danger_button(ui, "Decline") {
-                            self.app_state.session_decisions.lock().unwrap().insert(session.session_id.clone(), false);
-                            self.app_state.pending_sessions.lock().unwrap().remove(&session.session_id);
-                            let _ = self.app_state.event_tx.send(AppEvent::TransferDecision { session_id: session.session_id.clone(), accepted: false });
+                            self.app_state
+                                .session_decisions
+                                .lock()
+                                .unwrap()
+                                .insert(session.session_id.clone(), false);
+                            self.app_state
+                                .pending_sessions
+                                .lock()
+                                .unwrap()
+                                .remove(&session.session_id);
+                            let _ = self.app_state.event_tx.send(AppEvent::TransferDecision {
+                                session_id: session.session_id.clone(),
+                                accepted: false,
+                            });
                         }
                         ui.add_space(8.0);
                         if Self::accent_button(ui, "Accept") {
-                            self.app_state.session_decisions.lock().unwrap().insert(session.session_id.clone(), true);
-                            let _ = self.app_state.event_tx.send(AppEvent::TransferDecision { session_id: session.session_id.clone(), accepted: true });
+                            self.app_state
+                                .session_decisions
+                                .lock()
+                                .unwrap()
+                                .insert(session.session_id.clone(), true);
+                            let _ = self.app_state.event_tx.send(AppEvent::TransferDecision {
+                                session_id: session.session_id.clone(),
+                                accepted: true,
+                            });
                         }
                     });
                 });
@@ -497,13 +556,30 @@ impl eframe::App for KdropApp {
                 .show(ctx, |ui| {
                     ui.set_min_width(300.0);
                     ui.vertical_centered(|ui| {
-                        ui.label(egui::RichText::new("Scan with iPhone or Android").size(15.0).strong().color(TEXT_PRIMARY));
+                        ui.label(
+                            egui::RichText::new("Scan with iPhone or Android")
+                                .size(15.0)
+                                .strong()
+                                .color(TEXT_PRIMARY),
+                        );
                         ui.add_space(12.0);
-                        if let Some(texture) = &self.qr_texture { ui.image(texture); }
+                        if let Some(texture) = &self.qr_texture {
+                            ui.image(texture);
+                        }
                         ui.add_space(10.0);
-                        ui.label(egui::RichText::new(format!("Or open in browser:\n{}", self.config.local_url())).size(12.0).monospace().color(TEXT_MUTED));
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Or open in browser:\n{}",
+                                self.config.local_url()
+                            ))
+                            .size(12.0)
+                            .monospace()
+                            .color(TEXT_MUTED),
+                        );
                         ui.add_space(16.0);
-                        if Self::ghost_button(ui, "Close") { self.show_qr_modal = false; }
+                        if Self::ghost_button(ui, "Close") {
+                            self.show_qr_modal = false;
+                        }
                     });
                 });
         }

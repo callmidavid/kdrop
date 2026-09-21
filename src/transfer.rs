@@ -180,7 +180,11 @@ impl TransferManager {
                 .context("Failed while streaming file to recipient")?;
 
             if !send_res.status().is_success() {
-                let err = format!("Transfer failed for {}: status {}", info.file_name, send_res.status());
+                let err = format!(
+                    "Transfer failed for {}: status {}",
+                    info.file_name,
+                    send_res.status()
+                );
                 progress_callback(TransferProgress::Failed(err.clone()));
                 return Err(anyhow!(err));
             }
@@ -193,4 +197,3 @@ impl TransferManager {
         Ok(())
     }
 }
-
