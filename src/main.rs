@@ -1,6 +1,7 @@
 mod config;
 mod discovery;
 mod peer;
+mod proximity;
 mod server;
 mod transfer;
 mod ui;
@@ -9,6 +10,7 @@ use anyhow::Result;
 use config::Config;
 use discovery::start_discovery;
 use peer::PeerRegistry;
+use proximity::{start_proximity_scanner, ProximityTracker};
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use server::{create_router, AppState};
@@ -28,6 +30,7 @@ async fn main() -> Result<()> {
     let config = Arc::new(Config::load_or_create()?);
     let registry = PeerRegistry::new();
     let app_state = AppState::new(config.clone(), registry.clone());
+    let proximity_tracker = Arc::new(ProximityTracker::new());
 
     info!("Starting kdrop for '{}' ({})", config.alias, config.fingerprint);
 
@@ -35,6 +38,9 @@ async fn main() -> Result<()> {
     if let Err(e) = start_discovery(config.clone(), registry.clone()) {
         error!("Failed to initialize discovery service: {}", e);
     }
+
+    // 2.5 Start Bluetooth LE RSSI Proximity scanner
+    start_proximity_scanner(proximity_tracker.clone());
 
     // 3. Start axum HTTP server
     let router = create_router(app_state.clone());
@@ -84,13 +90,14 @@ async fn main() -> Result<()> {
         let app_config = config.clone();
         let app_reg = registry.clone();
         let app_st = app_state.clone();
+        let app_prox = proximity_tracker.clone();
 
         // Run GUI on main thread
         let _ = eframe::run_native(
             "kdrop",
             native_options,
             Box::new(move |cc| {
-                Box::new(KdropApp::new(cc, app_config, app_reg, app_st))
+                Box::new(KdropApp::new(cc, app_config, app_reg, app_st, app_prox))
             }),
         );
     }

@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::peer::{PeerRegistry, PendingSession};
+use crate::proximity::ProximityTracker;
 use crate::server::{AppEvent, AppState};
 use crate::transfer::{TransferManager, TransferProgress};
 use eframe::egui;
@@ -12,6 +13,7 @@ pub struct KdropApp {
     config: Arc<Config>,
     registry: PeerRegistry,
     app_state: AppState,
+    proximity_tracker: Arc<ProximityTracker>,
     transfer_manager: Arc<TransferManager>,
     current_progress: Arc<Mutex<Option<TransferProgress>>>,
     show_qr_modal: bool,
@@ -25,6 +27,7 @@ impl KdropApp {
         config: Arc<Config>,
         registry: PeerRegistry,
         app_state: AppState,
+        proximity_tracker: Arc<ProximityTracker>,
     ) -> Self {
         // Apply Kafy OS Dark styling
         let mut style = (*cc.egui_ctx.style()).clone();
@@ -45,6 +48,7 @@ impl KdropApp {
             config,
             registry,
             app_state,
+            proximity_tracker,
             transfer_manager,
             current_progress,
             show_qr_modal: false,
@@ -125,6 +129,57 @@ impl eframe::App for KdropApp {
             ui.add_space(12.0);
             ui.separator();
             ui.add_space(10.0);
+
+            // 1.5 AirDrop-style Physical Proximity Bump Banner
+            if let Some(bumped) = self.proximity_tracker.get_bumped_device() {
+                ui.group(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("⚡")
+                                .size(28.0)
+                                .color(egui::Color32::from_rgb(190, 150, 255)),
+                        );
+                        ui.vertical(|ui| {
+                            let name = bumped.name.as_deref().unwrap_or("Phone / Mobile Device");
+                            ui.label(
+                                egui::RichText::new(format!("⚡ Device Bump: '{}' is right beside laptop!", name))
+                                    .size(14.0)
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(120, 240, 180)),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!("Signal: {:.0} dBm • < 20 cm physical distance", bumped.smoothed_rssi))
+                                    .size(11.0)
+                                    .color(egui::Color32::from_rgb(160, 170, 195)),
+                            );
+                        });
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(egui::RichText::new("⚡ Drop Files").strong().color(egui::Color32::WHITE)).clicked() {
+                                if let Some(files) = rfd::FileDialog::new().pick_files() {
+                                    let peers = self.registry.all();
+                                    if let Some(first_peer) = peers.first() {
+                                        let tm = self.transfer_manager.clone();
+                                        let progress_clone = self.current_progress.clone();
+                                        let peer_clone = first_peer.clone();
+
+                                        tokio::spawn(async move {
+                                            let cb_prog = progress_clone.clone();
+                                            let _ = tm
+                                                .send_files(&peer_clone, files, move |prog| {
+                                                    *cb_prog.lock().unwrap() = Some(prog);
+                                                })
+                                                .await;
+                                        });
+                                    }
+                                }
+                            }
+                        });
+                    });
+                });
+                ui.add_space(10.0);
+            }
 
             // 2. Active Transfer Progress
             let progress_opt = self.current_progress.lock().unwrap().clone();
