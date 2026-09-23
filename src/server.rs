@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::peer::{FileInfo, PeerRegistry, PendingSession};
+use crate::peer::{FileInfo, PendingSession};
 use anyhow::Result;
 use axum::{
     body::Body,
@@ -50,6 +50,12 @@ pub struct SharedFileItem {
     pub path: PathBuf,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct IncomingUploadProgress {
+    pub file_name: String,
+    pub received_bytes: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendRequestPayload {
     pub sender_alias: String,
@@ -80,22 +86,22 @@ pub enum AppEvent {
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
-    pub registry: PeerRegistry,
     pub pending_sessions: Arc<Mutex<HashMap<String, PendingSession>>>,
     pub session_decisions: Arc<Mutex<HashMap<String, bool>>>,
     pub shared_files: Arc<Mutex<Vec<SharedFileItem>>>,
+    pub incoming_upload: Arc<Mutex<Option<IncomingUploadProgress>>>,
     pub event_tx: broadcast::Sender<AppEvent>,
 }
 
 impl AppState {
-    pub fn new(config: Arc<Config>, registry: PeerRegistry) -> Self {
+    pub fn new(config: Arc<Config>) -> Self {
         let (event_tx, _) = broadcast::channel(100);
         Self {
             config,
-            registry,
             pending_sessions: Arc::new(Mutex::new(HashMap::new())),
             session_decisions: Arc::new(Mutex::new(HashMap::new())),
             shared_files: Arc::new(Mutex::new(Vec::new())),
+            incoming_upload: Arc::new(Mutex::new(None)),
             event_tx,
         }
     }
@@ -261,11 +267,22 @@ async fn handle_upload(
 
         let target_path = download_dir.join(&file_name);
 
+        {
+            let mut progress = state.incoming_upload.lock().unwrap();
+            *progress = Some(IncomingUploadProgress {
+                file_name: file_name.clone(),
+                received_bytes: 0,
+            });
+        }
+
         if let Ok(file) = tokio::fs::File::create(&target_path).await {
             let mut writer = tokio::io::BufWriter::with_capacity(512 * 1024, file);
             let mut failed = false;
 
             while let Ok(Some(chunk)) = field.chunk().await {
+                if let Some(progress) = state.incoming_upload.lock().unwrap().as_mut() {
+                    progress.received_bytes += chunk.len() as u64;
+                }
                 if let Err(e) = writer.write_all(&chunk).await {
                     error!("Failed writing upload chunk to {:?}: {}", target_path, e);
                     failed = true;
@@ -278,6 +295,8 @@ async fn handle_upload(
                 let _ = state.add_shared_file(target_path);
                 saved_any = true;
             }
+
+            *state.incoming_upload.lock().unwrap() = None;
         }
     }
 
@@ -297,8 +316,6 @@ async fn handle_send_request(
     let session = PendingSession {
         session_id: session_id.clone(),
         sender_alias: payload.sender_alias.clone(),
-        sender_ip: String::new(),
-        sender_port: 0,
         files: payload.files.clone(),
     };
 

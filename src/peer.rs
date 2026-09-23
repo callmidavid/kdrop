@@ -102,15 +102,6 @@ impl PeerRegistry {
             .map(|e| e.peer.clone())
             .collect()
     }
-
-    /// Look up a peer by fingerprint.
-    pub fn get(&self, fingerprint: &str) -> Option<Peer> {
-        self.inner
-            .read()
-            .unwrap()
-            .get(fingerprint)
-            .map(|e| e.peer.clone())
-    }
 }
 
 /// Metadata for a single file in a transfer request.
@@ -128,7 +119,5 @@ pub struct FileInfo {
 pub struct PendingSession {
     pub session_id: String,
     pub sender_alias: String,
-    pub sender_ip: String,
-    pub sender_port: u16,
     pub files: Vec<FileInfo>,
 }

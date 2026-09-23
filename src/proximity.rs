@@ -7,6 +7,19 @@ use tracing::debug;
 #[cfg(target_os = "linux")]
 use tracing::{info, warn};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProximityStatus {
+    Starting,
+    Scanning,
+    Unavailable,
+}
+
+impl Default for ProximityStatus {
+    fn default() -> Self {
+        Self::Starting
+    }
+}
+
 /// Proximity classifications based on calibrated BLE RSSI values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProximityZone {
@@ -19,6 +32,7 @@ pub enum ProximityZone {
 }
 
 impl ProximityZone {
+    #[cfg(target_os = "linux")]
     pub fn from_rssi(rssi: f32) -> Self {
         if rssi >= -44.0 {
             ProximityZone::Touch
@@ -28,23 +42,17 @@ impl ProximityZone {
             ProximityZone::Far
         }
     }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            ProximityZone::Touch => "⚡ Beside Laptop (< 20 cm)",
-            ProximityZone::Near => "📶 Nearby (< 1.5 m)",
-            ProximityZone::Far => "📡 In Room (> 1.5 m)",
-        }
-    }
 }
 
 /// An exponential moving average (EMA) filter to eliminate radio noise and jitter.
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
 pub struct RssiFilter {
     pub smoothed: f32,
     alpha: f32,
 }
 
+#[cfg(target_os = "linux")]
 impl RssiFilter {
     pub fn new(initial_rssi: i16) -> Self {
         Self {
@@ -66,14 +74,17 @@ pub struct NearbyBleDevice {
     pub name: Option<String>,
     pub smoothed_rssi: f32,
     pub zone: ProximityZone,
-    #[serde(skip, default = "Instant::now")]
+    #[cfg_attr(target_os = "linux", serde(skip, default = "Instant::now"))]
+    #[cfg(target_os = "linux")]
     pub last_seen: Instant,
 }
 
 /// Thread-safe registry tracking real-time Bluetooth LE proximity.
 #[derive(Clone, Default)]
 pub struct ProximityTracker {
+    #[cfg(target_os = "linux")]
     devices: Arc<Mutex<HashMap<String, (NearbyBleDevice, RssiFilter)>>>,
+    status: Arc<Mutex<ProximityStatus>>,
 }
 
 impl ProximityTracker {
@@ -81,7 +92,16 @@ impl ProximityTracker {
         Self::default()
     }
 
+    pub fn status(&self) -> ProximityStatus {
+        *self.status.lock().unwrap()
+    }
+
+    fn set_status(&self, status: ProximityStatus) {
+        *self.status.lock().unwrap() = status;
+    }
+
     /// Record or update an RSSI observation for a device.
+    #[cfg(target_os = "linux")]
     pub fn record_observation(&self, address: String, name: Option<String>, raw_rssi: i16) {
         let mut map = self.devices.lock().unwrap();
         let entry = map.entry(address.clone()).or_insert_with(|| {
@@ -110,6 +130,7 @@ impl ProximityTracker {
     }
 
     /// Evicts devices not heard from in the last 12 seconds.
+    #[cfg(target_os = "linux")]
     pub fn evict_stale(&self) {
         let mut map = self.devices.lock().unwrap();
         map.retain(|_, (dev, _)| dev.last_seen.elapsed() < Duration::from_secs(12));
@@ -117,19 +138,19 @@ impl ProximityTracker {
 
     /// Returns the closest device currently in the "Touch / Bump" zone (< 20 cm).
     pub fn get_bumped_device(&self) -> Option<NearbyBleDevice> {
-        let map = self.devices.lock().unwrap();
-        map.values()
-            .filter(|(dev, _)| dev.zone == ProximityZone::Touch)
-            .max_by(|a, b| a.0.smoothed_rssi.partial_cmp(&b.0.smoothed_rssi).unwrap())
-            .map(|(dev, _)| dev.clone())
-    }
+        #[cfg(target_os = "linux")]
+        {
+            let map = self.devices.lock().unwrap();
+            map.values()
+                .filter(|(dev, _)| dev.zone == ProximityZone::Touch)
+                .max_by(|a, b| a.0.smoothed_rssi.partial_cmp(&b.0.smoothed_rssi).unwrap())
+                .map(|(dev, _)| dev.clone())
+        }
 
-    /// Returns all active nearby BLE devices sorted from closest to farthest.
-    pub fn get_all_devices(&self) -> Vec<NearbyBleDevice> {
-        let map = self.devices.lock().unwrap();
-        let mut list: Vec<NearbyBleDevice> = map.values().map(|(dev, _)| dev.clone()).collect();
-        list.sort_by(|a, b| b.smoothed_rssi.partial_cmp(&a.smoothed_rssi).unwrap());
-        list
+        #[cfg(not(target_os = "linux"))]
+        {
+            None
+        }
     }
 }
 
@@ -148,6 +169,7 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
                         "Bluetooth D-Bus session unavailable: {}. Proximity sensing disabled.",
                         e
                     );
+                    scan_tracker.set_status(ProximityStatus::Unavailable);
                     return;
                 }
             };
@@ -159,6 +181,7 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
                         "No Bluetooth adapter found (hci0): {}. Proximity sensing disabled.",
                         e
                     );
+                    scan_tracker.set_status(ProximityStatus::Unavailable);
                     return;
                 }
             };
@@ -176,9 +199,12 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
                 Ok(stream) => stream,
                 Err(e) => {
                     warn!("Failed to start BLE discovery stream: {}. (Run with Bluetooth permissions)", e);
+                    scan_tracker.set_status(ProximityStatus::Unavailable);
                     return;
                 }
             };
+
+            scan_tracker.set_status(ProximityStatus::Scanning);
 
             use futures::StreamExt;
             while let Some(event) = discover_events.next().await {
@@ -206,7 +232,7 @@ pub fn start_proximity_scanner(tracker: Arc<ProximityTracker>) {
 
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = tracker;
+        tracker.set_status(ProximityStatus::Unavailable);
         debug!("BLE proximity scanning not supported on this platform.");
     }
 }

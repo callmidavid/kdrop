@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::peer::{PeerRegistry, PendingSession};
-use crate::proximity::ProximityTracker;
+use crate::proximity::{ProximityStatus, ProximityTracker};
 use crate::server::{AppEvent, AppState};
 use crate::transfer::{TransferManager, TransferProgress};
 use eframe::egui;
@@ -189,6 +189,16 @@ impl KdropApp {
                 .color(TEXT_MUTED),
         );
     }
+
+    fn format_bytes(bytes: u64) -> String {
+        if bytes >= 1_000_000 {
+            format!("{:.1} MB", bytes as f64 / 1e6)
+        } else if bytes >= 1_000 {
+            format!("{:.1} KB", bytes as f64 / 1e3)
+        } else {
+            format!("{} B", bytes)
+        }
+    }
 }
 
 impl eframe::App for KdropApp {
@@ -220,6 +230,20 @@ impl eframe::App for KdropApp {
                             .color(TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if Self::accent_button(ui, "Share Files") {
+                            if let Some(files) = rfd::FileDialog::new().pick_files() {
+                                for file in files {
+                                    if let Err(error) = self.app_state.add_shared_file(file) {
+                                        *self.current_progress.lock().unwrap() =
+                                            Some(TransferProgress::Failed(format!(
+                                                "Could not share file: {}",
+                                                error
+                                            )));
+                                    }
+                                }
+                            }
+                        }
+                        ui.add_space(6.0);
                         if Self::ghost_button(ui, "Share via QR") {
                             self.show_qr_modal = true;
                             self.generate_qr_texture(ctx);
@@ -246,6 +270,19 @@ impl eframe::App for KdropApp {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
+                        ui.add_space(8.0);
+
+                        match self.proximity_tracker.status() {
+                            ProximityStatus::Scanning => {
+                                ui.label(egui::RichText::new("Bluetooth proximity scanning is active").size(11.0).color(TEXT_MUTED));
+                            }
+                            ProximityStatus::Starting => {
+                                ui.label(egui::RichText::new("Starting Bluetooth proximity scanner…").size(11.0).color(TEXT_MUTED));
+                            }
+                            ProximityStatus::Unavailable => {
+                                ui.label(egui::RichText::new("Bluetooth proximity is unavailable; use Share Files instead").size(11.0).color(WARNING));
+                            }
+                        }
                         ui.add_space(8.0);
 
                         // ── BLE Proximity Bump ────────────────────────
@@ -335,6 +372,25 @@ impl eframe::App for KdropApp {
                             ui.add_space(10.0);
                         }
 
+                        let upload_opt = self.app_state.incoming_upload.lock().unwrap().clone();
+                        if let Some(upload) = upload_opt {
+                            egui::Frame::none()
+                                .fill(CARD)
+                                .stroke(egui::Stroke::new(1.0_f32, CARD_BORDER))
+                                .rounding(egui::Rounding::same(12.0))
+                                .inner_margin(egui::Margin::same(14.0))
+                                .show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.spinner();
+                                        ui.vertical(|ui| {
+                                            ui.label(egui::RichText::new(format!("Receiving {}", upload.file_name)).strong().color(TEXT_PRIMARY));
+                                            ui.label(egui::RichText::new(format!("{} received from your browser", Self::format_bytes(upload.received_bytes))).size(11.0).color(TEXT_MUTED));
+                                        });
+                                    });
+                                });
+                            ui.add_space(10.0);
+                        }
+
                         // ── Nearby Devices ────────────────────────────
                         Self::section_label(ui, "NEARBY DEVICES");
                         ui.add_space(6.0);
@@ -403,7 +459,7 @@ impl eframe::App for KdropApp {
                         // ── Received Files ────────────────────────────
                         ui.horizontal(|ui| {
                             ui.set_width(ui.available_width());
-                            Self::section_label(ui, "RECEIVED FILES");
+                        Self::section_label(ui, "SHARED & RECEIVED FILES");
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 if Self::ghost_button(ui, "Open Folder") {
                                     let _ = open::that(&self.config.download_dir);
@@ -421,7 +477,7 @@ impl eframe::App for KdropApp {
                                 .inner_margin(egui::Margin::same(14.0))
                                 .show(ui, |ui| {
                                     ui.set_width(ui.available_width());
-                                    ui.label(egui::RichText::new("No files received yet — files sent to this device appear here").size(13.0).color(TEXT_MUTED));
+                                    ui.label(egui::RichText::new("Choose Share Files for your phone to download, or upload from the phone page").size(13.0).color(TEXT_MUTED));
                                 });
                         } else {
                             egui::ScrollArea::vertical()

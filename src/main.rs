@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     // 1. Load configuration & initialize state
     let config = Arc::new(Config::load_or_create()?);
     let registry = PeerRegistry::new();
-    let app_state = AppState::new(config.clone(), registry.clone());
+    let app_state = AppState::new(config.clone());
     let proximity_tracker = Arc::new(ProximityTracker::new());
 
     info!(
