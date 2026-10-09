@@ -6,6 +6,8 @@
 
 **An open-source, AirDrop-inspired local file sharing tool with Touch-to-Transfer proximity sensing.**
 
+[![Fund my work on FLOSSAfrica](https://flossafrica.com/badge.svg?theme=dark)](https://flossafrica.com/m/callmidavid?p=kdrop)
+
 Share files, photos, videos, and documents seamlessly across **Linux, iPhone, Android, Windows, and macOS** on the same Wi-Fi network. No internet connection, no third-party servers, no accounts, and no cables.
 
 [![Release](https://img.shields.io/github/v/release/callmidavid/kdrop?color=blue&logo=github)](https://github.com/callmidavid/kdrop/releases)
